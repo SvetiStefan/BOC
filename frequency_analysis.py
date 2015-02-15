@@ -2,9 +2,10 @@ import sys
 import math
 import operator
 import jieba
+import json
 import csv_parser
 import similarity
-
+from LogParser import LogParser
 from datetime import datetime
 
 log_file_name = 'data/servicelog'
@@ -18,6 +19,10 @@ code_2_meaning = {}
 call_reasons = {}
 call_reasons_segmented ={}
 trans_sorted = None
+
+setting_file = 'settings.json'
+trans_stat_file = 'trans.txt'
+filter_str = 'CSR'
 
 
 
@@ -91,7 +96,7 @@ def find_reason_with_similarity(trans_collection):
                 votes[best_reason_index] += adjusted_similarity
         votes_sorted = sorted(votes.items(), key=operator.itemgetter(1), reverse=True)
         reason_str = 'Not found' if votes_sorted[0][0] not in call_reasons else call_reasons[votes_sorted[0][0]]
-        print one_trans[0], votes_sorted[0][0], reason_str, votes_sorted[0][1]
+        print one_trans[0], one_trans[1], votes_sorted[0][0], reason_str, votes_sorted[0][1]
 
 def read_trans(file_name):
     current_date = datetime.strptime('2014-06-01', '%Y-%m-%d')
@@ -129,6 +134,10 @@ def read_trans(file_name):
 
 
 def main():
+    with open(setting_file, 'r') as f:
+        setting = json.load(f)
+        log_parser = LogParser(setting['service_log'], setting['trcode'], setting["filter_str"])
+        log_parser.process_and_store(setting['trans_stat_output'])
     
     read_trans(log_file_name)
     load_call_reason(call_reason_file_name)
