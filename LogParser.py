@@ -1,13 +1,10 @@
 import sys
 import operator
+from misc import check_keys
 import csv_parser
 from datetime import datetime
 from collections import defaultdict
 
-def check_keys(keys, d, d_name, tp=str):
-    for key in keys:
-        if key not in d or  not isinstance(d[key],tp):
-            raise Exception('Key {0} not found in {1} or its value is not {2}.'.format(key, d_name, tp))
 
 class LogParser(object):
     """LogParser class
