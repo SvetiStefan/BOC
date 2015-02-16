@@ -9,7 +9,7 @@ from collections import defaultdict
 
 class ReasonInferrer(object):
     """
-        This class infer call reasons for call transactions
+        This class infers call reasons for call transactions
     """
     def __init__(self, call_reason, trans_file):
         check_keys(["file_name"], call_reason, "call_reason", basestring)
@@ -22,9 +22,9 @@ class ReasonInferrer(object):
         self._call_reasons_segmented = {}
         self._trans = []
 
-    def find_reasons(self):
+    def find_reasons(self, limit=0):
         self.load_call_reason()
-        self.load_trans_and_find_reasons()
+        self.load_trans_and_find_reasons(limit)
 
     def load_call_reason(self):
         attribute_map, lines = read_csv_with_headers(self._call_reason_setting['file_name'])
@@ -35,7 +35,7 @@ class ReasonInferrer(object):
             segmented = list(jieba.cut(line[reason_index]))
             self._call_reasons_segmented[line[id_index]] = segmented
 
-    def load_trans_and_find_reasons(self):
+    def load_trans_and_find_reasons(self, limit):
         trans_count = 0
         with open(self._trans_file, 'r') as f:
             for line in f:
@@ -51,6 +51,8 @@ class ReasonInferrer(object):
                 reason_id, reason_str, vote_score = self.find_reason(chinese_parts)
                 print line.strip(), reason_id, reason_str, vote_score
                 trans_count += 1
+                if limit > 0 and trans_count >= limit:
+                    return
                 if trans_count % 10 == 0:
                     raw_input('Press any key to get another 10 results...')
 
