@@ -65,7 +65,7 @@ class LogParser(object):
     def _load_code_mapping(self):
         attribute_map, lines = csv_parser.read_csv_with_headers(self._trcode['file_name'])
         for line in lines:
-            self._code_2_meaning[line[self._trcode["code_id_index"]]] = line[self._trcode["code_name_index"]]
+            self._code_2_meaning[line[self._trcode["code_id_index"]]] = line[self._trcode["code_name_index"]].strip()
 
     def _make_trans_and_sort(self):
     	trans_stat = defaultdict(int)

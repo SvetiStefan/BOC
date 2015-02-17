@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import operator
 import math
@@ -31,36 +32,42 @@ class ReasonInferrer(object):
         id_index = self._call_reason_setting['call_reason_id_index']
         reason_index = self._call_reason_setting['call_reason_index']
         for line in lines:
-            self._call_reasons[line[id_index]] = line[reason_index]
-            segmented = list(jieba.cut(line[reason_index]))
+            self._call_reasons[line[id_index]] = line[reason_index].strip()
+            segmented = list(jieba.cut(line[reason_index].strip()))
             self._call_reasons_segmented[line[id_index]] = segmented
 
     def load_trans_and_find_reasons(self, limit):
         trans_count = 0
-        with open(self._trans_file, 'r') as f:
-            for line in f:
-                items = line.split('\t')
-                chinese_parts = []
-                for item in items[:-1]:
-                    try:
-                        chinese_part = item[item.index('(')+1 : -1]
-                        if chinese_part != '':
-                            chinese_parts.append(list(jieba.cut(chinese_part)))
-                    except:
-                        print "Invalid transaction :" + one_trans
-                reason_id, reason_str, vote_score = self.find_reason(chinese_parts)
-                print line.strip(), reason_id, reason_str, vote_score
-                trans_count += 1
-                if limit > 0 and trans_count >= limit:
-                    return
-                if trans_count % 10 == 0:
-                    raw_input('Press any key to get another 10 results...')
+        with open('res.csv', 'w') as fout:
+	        with open(self._trans_file, 'r') as f:
+	            for line in f:
+	                items = line.split('\t')
+	                chinese_parts = []
+	                for item in items[:-1]:
+	                    try:
+	                        chinese_part = item[item.index('(')+1 : -1]
+	                        if chinese_part not in ['', u'综合查询']:
+	                            chinese_parts.append(list(jieba.cut(chinese_part)))
+	                    except:
+	                        print "Invalid transaction :" + one_trans
+	                reason_id, reason_str, vote_score = self.find_reason(chinese_parts)
+	                print '->'.join(items[:-1]), items[-1].strip(), '\t', reason_id, reason_str, vote_score
+	                fout.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format('->'.join(items[:-1]), items[-1].strip(), reason_id, reason_str, vote_score))
+	                trans_count += 1
+	                if limit > 0 and trans_count >= limit:
+	                    return
+	                if trans_count % 10 == 0:
+	                    raw_input('Press any key to get another 10 results...')
 
     def get_best_similarity(self, one_trans):
         highest_similarity = 0.0
         best_reason_index = 0
         for key, vec in self._call_reasons_segmented.iteritems():
-            sim = similarity.simple_similarity(vec, one_trans)
+            sim = 0.0
+            if one_trans[-1] != u'查询' and vec[-1] != u'查询':
+                sim = similarity.simple_similarity(vec, one_trans)
+            elif one_trans[-1] == u'查询' and vec[-1] == u'查询':
+                sim = similarity.simple_similarity(vec[:-1], one_trans[:-1])
             if sim > highest_similarity:
                 highest_similarity = sim
                 best_reason_index = key
@@ -68,7 +75,7 @@ class ReasonInferrer(object):
 
     def find_reason(self, chinese_parts):
         reason_id = 0
-        reason_str = 'Not found'
+        reason_str = "综合查询/未知"
         vote_score = 0.0
         if len(chinese_parts) == 0:
             return reason_id, reason_str, vote_score
