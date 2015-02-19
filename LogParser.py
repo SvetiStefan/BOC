@@ -24,7 +24,7 @@ class LogParser(object):
         self._code_2_meaning = {}
 
     def process_and_store(self, file_name):
-        self._read_trans()
+        self._read_file()
         self._load_code_mapping()
         self._make_trans_and_sort()
         self._store_result(file_name)
@@ -34,7 +34,7 @@ class LogParser(object):
             for one_trans in self._trans_sorted:
                 f.write("{0}\t{1}\n".format(one_trans[0], one_trans[1]))
 
-    def _read_trans(self):
+    def _read_file(self):
         current_date = datetime.strptime(self._service_log["start_date"], '%Y-%m-%d')
         with open(self._service_log['file_name'], 'r') as f:
             start_date = datetime.strptime(self._service_log["start_date"], '%Y-%m-%d')
@@ -63,7 +63,7 @@ class LogParser(object):
         print "transaction number: ", len(self._trans)
 
     def _load_code_mapping(self):
-        attribute_map, lines = csv_parser.read_csv_with_headers(self._trcode['file_name'])
+        _, lines = csv_parser.read_csv_with_headers(self._trcode['file_name'])
         for line in lines:
             self._code_2_meaning[line[self._trcode["code_id_index"]]] = line[self._trcode["code_name_index"]].strip()
 
