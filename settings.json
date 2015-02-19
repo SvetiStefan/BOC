@@ -1,0 +1,22 @@
+{
+	"service_log": {
+		"file_name": "data/servicelog",
+		"date_index": 3,
+		"trans_id_index": 1,
+		"trans_code_index":4,
+		"start_date": "2014-06-01",
+		"end_date": "2014-08-31"
+	},
+	"trcode": {
+		"file_name": "data/TRCODE_update.csv",
+		"code_id_index": 0,
+		"code_name_index": 1
+	},
+	"call_reason": {
+		"file_name": "data/csrcallreason.csv",
+		"call_reason_id_index": 0,
+		"call_reason_index": 2
+	},
+	"trans_stat_output": "trans.txt",
+	"filter_str": "IVR"
+}
