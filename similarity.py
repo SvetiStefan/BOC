@@ -38,8 +38,8 @@ def main():
     """
         use main for simple testing
     """
-    words1 = [u"信用卡", u"交易", u"明细", u"查询", u" "]
-    words2 = [u"1309", u"―", u"QCC", u" ", u" ", u"POS", u"验证"]
+    words1 = [u"个人", u"卡", u"账单", u"调阅"]
+    words2 = [u"虚拟", u"卡", u"查询", u"实体", u"卡"]
     print simple_similarity(words1, words2)
 
 if __name__ == '__main__':

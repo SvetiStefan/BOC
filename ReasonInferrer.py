@@ -22,12 +22,9 @@ class ReasonInferrer(object):
         self._call_reasons = {}
         self._call_reasons_segmented = {}
         self._trans = []
+        self._load_call_reason()
 
-    def find_reasons(self, limit=0):
-        self.load_call_reason()
-        self.load_trans_and_find_reasons(limit)
-
-    def load_call_reason(self):
+    def _load_call_reason(self):
         attribute_map, lines = read_csv_with_headers(self._call_reason_setting['file_name'])
         id_index = self._call_reason_setting['call_reason_id_index']
         reason_index = self._call_reason_setting['call_reason_index']
@@ -36,30 +33,36 @@ class ReasonInferrer(object):
             segmented = list(jieba.cut(line[reason_index].strip()))
             self._call_reasons_segmented[line[id_index]] = segmented
 
-    def load_trans_and_find_reasons(self, limit):
+    def find_reasons(self, start=0, end=0, min_len=0):
         trans_count = 0
+        valid_trans_count = 0
         with open('res.csv', 'w') as fout:
-	        with open(self._trans_file, 'r') as f:
-	            for line in f:
-	                items = line.split('\t')
-	                chinese_parts = []
-	                for item in items[:-1]:
-	                    try:
-	                        chinese_part = item[item.index('(')+1 : -1]
-	                        if chinese_part not in ['', u'综合查询']:
-	                            chinese_parts.append(list(jieba.cut(chinese_part)))
-	                    except:
-	                        print "Invalid transaction :" + one_trans
-	                reason_id, reason_str, vote_score = self.find_reason(chinese_parts)
-	                print '->'.join(items[:-1]), items[-1].strip(), '\t', reason_id, reason_str, vote_score
-	                fout.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format('->'.join(items[:-1]), items[-1].strip(), reason_id, reason_str, vote_score))
-	                trans_count += 1
-	                if limit > 0 and trans_count >= limit:
-	                    return
-	                if trans_count % 10 == 0:
-	                    raw_input('Press any key to get another 10 results...')
+            with open(self._trans_file, 'r') as f:
+                for line in f:
+                    trans_count += 1
+                    if trans_count < start+1:
+                        continue
+                    if end != 0 and trans_count > end:
+                        return
+                    items = line.split('\t')
+                    chinese_parts = []
+                    for item in items[:-1]:
+                        try:
+                            chinese_part = item[item.index('(')+1 : -1]
+                            if chinese_part.decode('utf-8') not in ['', u'综合查询']:
+                                chinese_parts.append(list(jieba.cut(chinese_part)))
+                        except:
+                            print "Invalid transaction :" + line
+                    if len(chinese_parts) < min_len:
+                        continue
+                    reason_id, reason_str, vote_score = self._find_reason(chinese_parts)
+                    print '->'.join(items[:-1]), items[-1].strip(), '\t', reason_id, reason_str, vote_score
+                    fout.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format('->'.join(items[:-1]), items[-1].strip(), reason_id, reason_str, vote_score))
+                    valid_trans_count += 1
+                    if valid_trans_count % 10 == 0:
+                        raw_input('Press any key to get another 10 results...')
 
-    def get_best_similarity(self, one_trans):
+    def _get_best_similarity(self, one_trans):
         highest_similarity = 0.0
         best_reason_index = 0
         for key, vec in self._call_reasons_segmented.iteritems():
@@ -73,7 +76,7 @@ class ReasonInferrer(object):
                 best_reason_index = key
         return highest_similarity, best_reason_index
 
-    def find_reason(self, chinese_parts):
+    def _find_reason(self, chinese_parts):
         reason_id = 0
         reason_str = "综合查询/未知"
         vote_score = 0.0
@@ -81,7 +84,7 @@ class ReasonInferrer(object):
             return reason_id, reason_str, vote_score
         votes = defaultdict(float)
         for i in reversed(range(len(chinese_parts))):
-            highest_similarity, best_reason_index = self.get_best_similarity(chinese_parts[i])
+            highest_similarity, best_reason_index = self._get_best_similarity(chinese_parts[i])
             adjusted_similarity = highest_similarity * math.pow(0.5, (len(chinese_parts) - i - 1))
             votes[best_reason_index] += adjusted_similarity
         votes_sorted = sorted(votes.items(), key=operator.itemgetter(1), reverse=True)
