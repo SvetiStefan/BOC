@@ -12,9 +12,11 @@ class ReasonInferrer(object):
     """
         This class infers call reasons for call transactions
     """
-    def __init__(self, call_reason, trans_file):
+    def __init__(self, trcode, call_reason, trans_file):
         check_keys(["file_name"], call_reason, "call_reason", basestring)
         check_keys(["call_reason_id_index", "call_reason_index"], call_reason, "call_reason", int)
+        check_keys(["file_name"], trcode, "trcode", basestring)
+        check_keys(["code_id_index", "code_type_index", "code_name_index"], trcode, "trcode", int)
         if not os.path.isfile(trans_file):
             raise Exception("{0} does not exist.".format(trans_file))
         self._call_reason_setting = call_reason
@@ -22,10 +24,21 @@ class ReasonInferrer(object):
         self._call_reasons = {}
         self._call_reasons_segmented = {}
         self._trans = []
+        self._trcode = trcode
+        self._code_mapping = {}
+        self._load_code_mapping()
         self._load_call_reason()
 
+    def _load_code_mapping(self):
+        _, lines = read_csv_with_headers(self._trcode['file_name'])
+        for line in lines:
+            code_id = line[self._trcode["code_id_index"]]
+            code_type = line[self._trcode["code_type_index"]].strip()
+            code_name = line[self._trcode["code_name_index"]].strip()
+            self._code_mapping[code_id] = [code_type, code_name]
+
     def _load_call_reason(self):
-        attribute_map, lines = read_csv_with_headers(self._call_reason_setting['file_name'])
+        _, lines = read_csv_with_headers(self._call_reason_setting['file_name'])
         id_index = self._call_reason_setting['call_reason_id_index']
         reason_index = self._call_reason_setting['call_reason_index']
         for line in lines:
@@ -46,18 +59,27 @@ class ReasonInferrer(object):
                         return
                     items = line.split('\t')
                     chinese_parts = []
+                    full_trans = []
                     for item in items[:-1]:
-                        try:
-                            chinese_part = item[item.index('(')+1 : -1]
+                        if item in self._code_mapping:
+                            code_type, chinese_part = self._code_mapping[item]
                             if chinese_part.decode('utf-8') not in ['', u'综合查询']:
-                                chinese_parts.append(list(jieba.cut(chinese_part)))
-                        except:
-                            print "Invalid transaction :" + line
+                                chinese_parts.append([list(jieba.cut(chinese_part)), code_type])
+                            full_trans.append("{0}({1})".format(item, chinese_part))
+                        else:
+                            full_trans.append("{0}".format(item))
+                        # try:
+                        #     chinese_part = item[item.index('(')+1 : -1]
+                        #     if chinese_part.decode('utf-8') not in ['', u'综合查询']:
+                        #         chinese_parts.append(list(jieba.cut(chinese_part)))
+                        # except:
+                        #     print "Invalid transaction :" + line
                     if len(chinese_parts) < min_len:
                         continue
-                    reason_id, reason_str, vote_score = self._find_reason(chinese_parts)
-                    print '->'.join(items[:-1]), items[-1].strip(), '\t', reason_id, reason_str, vote_score
-                    fout.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format('->'.join(items[:-1]), items[-1].strip(), reason_id, reason_str, vote_score))
+                    reason_str = self._arrange_trans_and_find_reason(chinese_parts)
+
+                    print '->'.join(full_trans), items[-1].strip(), '\t', reason_str
+                    fout.write('{0}\t{1}\t{2}\n'.format('->'.join(full_trans), items[-1].strip(), reason_str))
                     valid_trans_count += 1
                     if valid_trans_count % 10 == 0:
                         raw_input('Press any key to get another 10 results...')
@@ -67,27 +89,58 @@ class ReasonInferrer(object):
         best_reason_index = 0
         for key, vec in self._call_reasons_segmented.iteritems():
             sim = 0.0
+            # print one_trans[-1], type(one_trans[-1])
+            # print vec[-1], type(vec[-1])
+            # print one_trans[-1] == u'查询', vec[-1] == u'查询'
+            # if one_trans[-1] == u'查询' and vec[-1] == u'查询':
+            #     raw_input('press any key to continue')
             if one_trans[-1] != u'查询' and vec[-1] != u'查询':
                 sim = similarity.simple_similarity(vec, one_trans)
             elif one_trans[-1] == u'查询' and vec[-1] == u'查询':
+                #raw_input('press any key to continue')
                 sim = similarity.simple_similarity(vec[:-1], one_trans[:-1])
             if sim > highest_similarity:
                 highest_similarity = sim
                 best_reason_index = key
         return highest_similarity, best_reason_index
 
-    def _find_reason(self, chinese_parts):
+    def _arrange_trans_and_find_reason(self, chinese_parts):
+        reason_str = "0-综合查询/未知(0.0)"
+        if len(chinese_parts) == 0:
+            return reason_id+'-'+reason_str, vote_score
+        reasons = defaultdict(float)
+        one_seg = []
+        found_action = False
+        for chinese_part in chinese_parts:
+            one_seg.append(chinese_part[0])
+            if chinese_part[1] == '2':
+                found_action = True
+                reason_str, sim = self._find_reason(one_seg, has_action=True)
+                reasons[reason_str] += sim
+                one_seg = []
+        # Action type of trans not found, consider query type of trans
+        if len(one_seg) > 0 and not found_action: 
+            reason_str, sim = self._find_reason(one_seg, has_action=False)
+            reasons[reason_str] += sim
+        if len(reasons) > 1:
+            raw_input('found transaction with 2 reasons')
+        reason_sorted = sorted(reasons.items(), key=operator.itemgetter(1), reverse=True)
+        reason_str = ', '.join(['{0}({1})'.format(key, value) for [key, value] in reason_sorted])
+        return reason_str
+
+
+    def _find_reason(self, chinese_parts, has_action):
         reason_id = 0
         reason_str = "综合查询/未知"
         vote_score = 0.0
-        if len(chinese_parts) == 0:
-            return reason_id, reason_str, vote_score
         votes = defaultdict(float)
         for i in reversed(range(len(chinese_parts))):
             highest_similarity, best_reason_index = self._get_best_similarity(chinese_parts[i])
             adjusted_similarity = highest_similarity * math.pow(0.5, (len(chinese_parts) - i - 1))
             votes[best_reason_index] += adjusted_similarity
+            if has_action and i == (len(chinese_parts) - 1) and highest_similarity > 0:
+                break
         votes_sorted = sorted(votes.items(), key=operator.itemgetter(1), reverse=True)
         if votes_sorted[0][0] in self._call_reasons:
             reason_str = self._call_reasons[votes_sorted[0][0]]
-        return votes_sorted[0][0], reason_str, votes_sorted[0][1]
+        return votes_sorted[0][0]+'-'+reason_str, votes_sorted[0][1]

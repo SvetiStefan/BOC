@@ -1,7 +1,6 @@
 import sys
 import operator
 from misc import check_keys
-import csv_parser
 from datetime import datetime
 from collections import defaultdict
 
@@ -11,13 +10,10 @@ class LogParser(object):
        It passes the servicelog, stats frequency of all call trasactions.
        The stat result will be output into a file
     """
-    def __init__(self, service_log, trcode, filter_str = ""):
+    def __init__(self, service_log, filter_str = ""):
         check_keys(["file_name", "start_date", "end_date"], service_log, 'service_log', basestring)
         check_keys(["date_index", "trans_id_index", "trans_code_index"], service_log, 'service_log', int)
-        check_keys(["file_name"], trcode, "trcode", basestring)
-        check_keys(["code_id_index", "code_name_index"], trcode, "trcode", int)
         self._service_log = service_log
-        self._trcode = trcode
         self._filter = filter_str
         self._trans = defaultdict(list)
         self._trans_sorted = []
@@ -25,7 +21,6 @@ class LogParser(object):
 
     def process_and_store(self, file_name):
         self._read_file()
-        self._load_code_mapping()
         self._make_trans_and_sort()
         self._store_result(file_name)
 
@@ -62,20 +57,16 @@ class LogParser(object):
         sys.stdout.write('\n')
         print "transaction number: ", len(self._trans)
 
-    def _load_code_mapping(self):
-        _, lines = csv_parser.read_csv_with_headers(self._trcode['file_name'])
-        for line in lines:
-            self._code_2_meaning[line[self._trcode["code_id_index"]]] = line[self._trcode["code_name_index"]].strip()
-
     def _make_trans_and_sort(self):
     	trans_stat = defaultdict(int)
         for trans_items in self._trans.itervalues():
             itemset = []
             for one_item in trans_items:
-                if one_item in self._code_2_meaning:
-                    itemset.append('{0}({1})'.format(one_item, self._code_2_meaning[one_item]))
-                else:
-                    itemset.append(one_item + '()')
+                # if one_item in self._code_2_meaning:
+                #     itemset.append('{0}({1})'.format(one_item, self._code_2_meaning[one_item]))
+                # else:
+                #     itemset.append(one_item + '()')
+                itemset.append(one_item)
             trans_key = '\t'.join(itemset)
             trans_stat[trans_key] += 1
         print "transaction types: ", len(trans_stat)
