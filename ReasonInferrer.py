@@ -16,7 +16,7 @@ class ReasonInferrer(object):
         check_keys(["file_name"], call_reason, "call_reason", basestring)
         check_keys(["call_reason_id_index", "call_reason_index"], call_reason, "call_reason", int)
         check_keys(["file_name"], trcode, "trcode", basestring)
-        check_keys(["code_id_index", "code_type_index", "code_name_index"], trcode, "trcode", int)
+        check_keys(["code_id_index", "code_type_index", "code_name_index", "code_reason_index"], trcode, "trcode", int)
         if not os.path.isfile(trans_file):
             raise Exception("{0} does not exist.".format(trans_file))
         self._call_reason_setting = call_reason
@@ -35,7 +35,8 @@ class ReasonInferrer(object):
             code_id = line[self._trcode["code_id_index"]]
             code_type = line[self._trcode["code_type_index"]].strip()
             code_name = line[self._trcode["code_name_index"]].strip()
-            self._code_mapping[code_id] = [code_type, code_name]
+            code_reason = line[self._trcode["code_reason_index"]].strip()
+            self._code_mapping[code_id] = [code_type, code_name, code_reason]
 
     def _load_call_reason(self):
         _, lines = read_csv_with_headers(self._call_reason_setting['file_name'])
@@ -62,9 +63,9 @@ class ReasonInferrer(object):
                     full_trans = []
                     for item in items[:-1]:
                         if item in self._code_mapping:
-                            code_type, chinese_part = self._code_mapping[item]
+                            code_type, chinese_part, code_reason = self._code_mapping[item]
                             if chinese_part.decode('utf-8') not in ['', u'综合查询']:
-                                chinese_parts.append([list(jieba.cut(chinese_part)), code_type])
+                                chinese_parts.append([list(jieba.cut(chinese_part)), code_reason, code_type])
                             full_trans.append("{0}({1})".format(item, chinese_part))
                         else:
                             full_trans.append("{0}".format(item))
@@ -112,8 +113,8 @@ class ReasonInferrer(object):
         one_seg = []
         found_action = False
         for chinese_part in chinese_parts:
-            one_seg.append(chinese_part[0])
-            if chinese_part[1] == '2':
+            one_seg.append(chinese_part[:-1])
+            if chinese_part[-1] == '2':
                 found_action = True
                 reason_str, sim = self._find_reason(one_seg, has_action=True)
                 reasons[reason_str] += sim
@@ -129,13 +130,16 @@ class ReasonInferrer(object):
         return reason_str
 
 
-    def _find_reason(self, chinese_parts, has_action):
+    def _find_reason(self, chinese_parts, has_action, use_mapping=True):
         reason_id = 0
         reason_str = "综合查询/未知"
         vote_score = 0.0
         votes = defaultdict(float)
         for i in reversed(range(len(chinese_parts))):
-            highest_similarity, best_reason_index = self._get_best_similarity(chinese_parts[i])
+            highest_similarity, best_reason_index = self._get_best_similarity(chinese_parts[i][0])
+            if use_mapping and chinese_parts[i][1] != '':
+                best_reason_index = chinese_parts[i][1]
+                highest_similarity = 1.0
             adjusted_similarity = highest_similarity * math.pow(0.5, (len(chinese_parts) - i - 1))
             votes[best_reason_index] += adjusted_similarity
             if has_action and i == (len(chinese_parts) - 1) and highest_similarity > 0:

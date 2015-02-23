@@ -11,7 +11,8 @@
 		"file_name": "data/TRCODE_update.csv",
 		"code_id_index": 0,
 		"code_name_index": 1,
-		"code_type_index": 2
+		"code_type_index": 2,
+		"code_reason_index": 6
 	},
 	"call_reason": {
 		"file_name": "data/csrcallreason.csv",
