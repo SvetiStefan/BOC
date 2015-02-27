@@ -68,7 +68,7 @@ class ReasonInferrer(object):
                                 chinese_parts.append([list(jieba.cut(chinese_part)), code_reason, code_type])
                             full_trans.append("{0}({1})".format(item, chinese_part))
                         else:
-                            full_trans.append("{0}".format(item))
+                            full_trans.append("{0}()".format(item))
                         # try:
                         #     chinese_part = item[item.index('(')+1 : -1]
                         #     if chinese_part.decode('utf-8') not in ['', u'综合查询']:
@@ -79,7 +79,7 @@ class ReasonInferrer(object):
                         continue
                     reason_str = self._arrange_trans_and_find_reason(chinese_parts)
 
-                    print '->'.join(full_trans), items[-1].strip(), '\t', reason_str
+                    print '->'.join(full_trans), items[-1].strip(), '\t', reason_str, '\n'
                     fout.write('{0}\t{1}\t{2}\n'.format('->'.join(full_trans), items[-1].strip(), reason_str))
                     valid_trans_count += 1
                     if valid_trans_count % 10 == 0:
@@ -105,7 +105,7 @@ class ReasonInferrer(object):
                 best_reason_index = key
         return highest_similarity, best_reason_index
 
-    def _arrange_trans_and_find_reason(self, chinese_parts):
+    def _arrange_trans_and_find_reason(self, chinese_parts, threshold=0.5):
         reason_str = "0-综合查询/未知(0.0)"
         if len(chinese_parts) == 0:
             return reason_id+'-'+reason_str, vote_score
@@ -116,17 +116,25 @@ class ReasonInferrer(object):
             one_seg.append(chinese_part[:-1])
             if chinese_part[-1] == '2':
                 found_action = True
-                reason_str, sim = self._find_reason(one_seg, has_action=True)
-                reasons[reason_str] += sim
+                # reason_str, sim = self._find_reason(one_seg, has_action=True)
+                # reasons[reason_str] += sim
+                reason_clip = self._find_reason(one_seg, has_action=True)
+                for reason_index in reason_clip:
+                    reasons[reason_index] += reason_clip[reason_index]
                 one_seg = []
         # Action type of trans not found, consider query type of trans
         if len(one_seg) > 0 and not found_action: 
-            reason_str, sim = self._find_reason(one_seg, has_action=False)
-            reasons[reason_str] += sim
-        if len(reasons) > 1:
-            raw_input('found transaction with 2 reasons')
-        reason_sorted = sorted(reasons.items(), key=operator.itemgetter(1), reverse=True)
-        reason_str = ', '.join(['{0}({1})'.format(key, value) for [key, value] in reason_sorted])
+            # reason_str, sim = self._find_reason(one_seg, has_action=False)
+            # reasons[reason_str] += sim
+            reason_clip = self._find_reason(one_seg, has_action=False)
+            for reason_index in reason_clip:
+                reasons[reason_index] += reason_clip[reason_index]
+        reasons_filtered = {k: v for k, v in reasons.iteritems() if v > threshold}
+            
+        # if len(reasons_filtered) > 1:
+        #     raw_input('found transaction with 2 reasons')
+        reason_sorted = sorted(reasons_filtered.items(), key=operator.itemgetter(1), reverse=True)
+        reason_str = ', '.join(['{0}-{1}({2})'.format(key, self._call_reasons[key], value) for [key, value] in reason_sorted])
         return reason_str
 
 
@@ -140,11 +148,12 @@ class ReasonInferrer(object):
             if use_mapping and chinese_parts[i][1] != '':
                 best_reason_index = chinese_parts[i][1]
                 highest_similarity = 1.0
-            adjusted_similarity = highest_similarity * math.pow(0.5, (len(chinese_parts) - i - 1))
+            adjusted_similarity = highest_similarity * math.pow(0.7, (len(chinese_parts) - i - 1))
             votes[best_reason_index] += adjusted_similarity
             if has_action and i == (len(chinese_parts) - 1) and highest_similarity > 0:
                 break
-        votes_sorted = sorted(votes.items(), key=operator.itemgetter(1), reverse=True)
-        if votes_sorted[0][0] in self._call_reasons:
-            reason_str = self._call_reasons[votes_sorted[0][0]]
-        return votes_sorted[0][0]+'-'+reason_str, votes_sorted[0][1]
+        # votes_sorted = sorted(votes.items(), key=operator.itemgetter(1), reverse=True)
+        # if votes_sorted[0][0] in self._call_reasons:
+        #     reason_str = self._call_reasons[votes_sorted[0][0]]
+        # return votes_sorted[0][0]+'-'+reason_str, votes_sorted[0][1]
+        return votes
