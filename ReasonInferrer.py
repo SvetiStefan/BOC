@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
+import argparse
 import operator
 import math
+import json
 import jieba
 import similarity
 from csv_parser import read_csv_with_headers
@@ -47,6 +49,22 @@ class ReasonInferrer(object):
             segmented = list(jieba.cut(line[reason_index].strip()))
             self._call_reasons_segmented[line[id_index]] = segmented
 
+    def find_reasons_for_one_trans(self, trans, min_len=0):
+        chinese_parts =[]
+        full_trans = []
+        for item in trans:
+            if item in self._code_mapping:
+                code_type, chinese_part, code_reason = self._code_mapping[item]
+                if chinese_part.decode('utf-8') not in ['', u'综合查询']:
+                    chinese_parts.append([list(jieba.cut(chinese_part)), code_reason, code_type])
+                full_trans.append("{0}({1})".format(item, chinese_part))
+            else:
+                full_trans.append("{0}()".format(item))
+        full_trans_str = '->'.join(full_trans)
+        if min_len > 0 and len(chinese_parts) < min_len:
+            return full_trans_str, ''
+        return full_trans_str, self._arrange_trans_and_find_reason(chinese_parts)
+
     def find_reasons(self, start=0, end=0, min_len=0):
         trans_count = 0
         valid_trans_count = 0
@@ -59,28 +77,11 @@ class ReasonInferrer(object):
                     if end != 0 and trans_count > end:
                         return
                     items = line.split('\t')
-                    chinese_parts = []
-                    full_trans = []
-                    for item in items[:-1]:
-                        if item in self._code_mapping:
-                            code_type, chinese_part, code_reason = self._code_mapping[item]
-                            if chinese_part.decode('utf-8') not in ['', u'综合查询']:
-                                chinese_parts.append([list(jieba.cut(chinese_part)), code_reason, code_type])
-                            full_trans.append("{0}({1})".format(item, chinese_part))
-                        else:
-                            full_trans.append("{0}()".format(item))
-                        # try:
-                        #     chinese_part = item[item.index('(')+1 : -1]
-                        #     if chinese_part.decode('utf-8') not in ['', u'综合查询']:
-                        #         chinese_parts.append(list(jieba.cut(chinese_part)))
-                        # except:
-                        #     print "Invalid transaction :" + line
-                    if len(chinese_parts) < min_len:
+                    full_trans_str, reason_str = self.find_reasons_for_one_trans(items[:-1], min_len)
+                    if reason_str == '':
                         continue
-                    reason_str = self._arrange_trans_and_find_reason(chinese_parts)
-
-                    print '->'.join(full_trans), items[-1].strip(), '\t', reason_str, '\n'
-                    fout.write('{0}\t{1}\t{2}\n'.format('->'.join(full_trans), items[-1].strip(), reason_str))
+                    print full_trans_str, items[-1].strip(), '\t', reason_str, '\n'
+                    fout.write('{0}\t{1}\t{2}\n'.format(full_trans_str, items[-1].strip(), reason_str))
                     valid_trans_count += 1
                     if valid_trans_count % 10 == 0:
                         raw_input('Press any key to get another 10 results...')
@@ -157,3 +158,24 @@ class ReasonInferrer(object):
         #     reason_str = self._call_reasons[votes_sorted[0][0]]
         # return votes_sorted[0][0]+'-'+reason_str, votes_sorted[0][1]
         return votes
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--setting', default='settings.json', help='setting of ReasonInferrer, default settings.json')
+    parser.add_argument('-t', '--trans', default='', help='One transaction to be processed')
+    parser.add_argument('-d', '--delimiter', default=',', help='delimiter of trans')
+    args = parser.parse_args()
+
+    with open(args.setting, 'r') as f:
+        setting = json.load(f)
+        reason_inferrer = ReasonInferrer(setting['trcode'], setting['call_reason'], setting['trans_stat_output'])
+        if args.trans != '':
+            items = args.trans.split(args.delimiter)
+            full_trans_str, reason_str = reason_inferrer.find_reasons_for_one_trans(items)
+            print full_trans_str,'\t', reason_str
+        else:
+            reason_inferrer.find_reasons(start=0, end=0, min_len=5)
+
+
+if __name__ == '__main__':
+    main()
