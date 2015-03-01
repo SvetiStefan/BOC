@@ -91,15 +91,9 @@ class ReasonInferrer(object):
         best_reason_index = 0
         for key, vec in self._call_reasons_segmented.iteritems():
             sim = 0.0
-            # print one_trans[-1], type(one_trans[-1])
-            # print vec[-1], type(vec[-1])
-            # print one_trans[-1] == u'查询', vec[-1] == u'查询'
-            # if one_trans[-1] == u'查询' and vec[-1] == u'查询':
-            #     raw_input('press any key to continue')
             if one_trans[-1] != u'查询' and vec[-1] != u'查询':
                 sim = similarity.simple_similarity(vec, one_trans)
             elif one_trans[-1] == u'查询' and vec[-1] == u'查询':
-                #raw_input('press any key to continue')
                 sim = similarity.simple_similarity(vec[:-1], one_trans[:-1])
             if sim > highest_similarity:
                 highest_similarity = sim
@@ -117,23 +111,16 @@ class ReasonInferrer(object):
             one_seg.append(chinese_part[:-1])
             if chinese_part[-1] == '2':
                 found_action = True
-                # reason_str, sim = self._find_reason(one_seg, has_action=True)
-                # reasons[reason_str] += sim
                 reason_clip = self._find_reason(one_seg, has_action=True)
                 for reason_index in reason_clip:
                     reasons[reason_index] += reason_clip[reason_index]
                 one_seg = []
         # Action type of trans not found, consider query type of trans
         if len(one_seg) > 0 and not found_action: 
-            # reason_str, sim = self._find_reason(one_seg, has_action=False)
-            # reasons[reason_str] += sim
             reason_clip = self._find_reason(one_seg, has_action=False)
             for reason_index in reason_clip:
                 reasons[reason_index] += reason_clip[reason_index]
         reasons_filtered = {k: v for k, v in reasons.iteritems() if v > threshold}
-            
-        # if len(reasons_filtered) > 1:
-        #     raw_input('found transaction with 2 reasons')
         reason_sorted = sorted(reasons_filtered.items(), key=operator.itemgetter(1), reverse=True)
         reason_str = ', '.join(['{0}-{1}({2})'.format(key, self._call_reasons[key], value) for [key, value] in reason_sorted])
         return reason_str
@@ -153,10 +140,6 @@ class ReasonInferrer(object):
             votes[best_reason_index] += adjusted_similarity
             if has_action and i == (len(chinese_parts) - 1) and highest_similarity > 0:
                 break
-        # votes_sorted = sorted(votes.items(), key=operator.itemgetter(1), reverse=True)
-        # if votes_sorted[0][0] in self._call_reasons:
-        #     reason_str = self._call_reasons[votes_sorted[0][0]]
-        # return votes_sorted[0][0]+'-'+reason_str, votes_sorted[0][1]
         return votes
 
 def main():

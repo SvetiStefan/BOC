@@ -62,10 +62,6 @@ class LogParser(object):
         for trans_items in self._trans.itervalues():
             itemset = []
             for one_item in trans_items:
-                # if one_item in self._code_2_meaning:
-                #     itemset.append('{0}({1})'.format(one_item, self._code_2_meaning[one_item]))
-                # else:
-                #     itemset.append(one_item + '()')
                 itemset.append(one_item)
             trans_key = '\t'.join(itemset)
             trans_stat[trans_key] += 1
