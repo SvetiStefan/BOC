@@ -84,7 +84,7 @@ class ActionPatternMiner(object):
             self._action_stats[one_pattern[-1]]['total'] = 0
         self._action_stats[one_pattern[-1]]['total'] += freq
         if len(one_pattern) > 1:
-            clean_pattern = self._gen_pattern(one_pattern[:-1])
+            clean_pattern = set(one_pattern[:-1])
             for item in clean_pattern:
                 if item not in self._action_stats[one_pattern[-1]]:
                     self._action_stats[one_pattern[-1]][item] = 0
